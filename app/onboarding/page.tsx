@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { CheckCircle2, ArrowRight, Zap, Users, BarChart3 } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
 
 const steps = [
   {
@@ -53,15 +54,25 @@ const steps = [
 export default function OnboardingPage() {
   const [currentStep, setCurrentStep] = useState(0)
   const [isVisible, setIsVisible] = useState(true)
+  const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
+  const supabase = createClient()
 
   useEffect(() => {
-    // Mark onboarding as complete in localStorage
-    const hasSeenOnboarding = localStorage.getItem("onboarding-complete")
-    if (hasSeenOnboarding) {
-      router.replace("/dashboard")
+    const checkAuth = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        router.replace("/auth/login")
+      } else {
+        setIsLoading(false)
+      }
     }
-  }, [router])
+
+    checkAuth()
+  }, [router, supabase])
 
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
@@ -80,12 +91,23 @@ export default function OnboardingPage() {
   }
 
   const handleComplete = () => {
-    localStorage.setItem("onboarding-complete", "true")
     router.push("/dashboard")
   }
 
+  if (isLoading) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-secondary/20">
+        <div className="text-center">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-accent/10 mb-4">
+            <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+          </div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
   const step = steps[currentStep]
-  const StepIcon = step.icon
   const progress = ((currentStep + 1) / steps.length) * 100
 
   return (

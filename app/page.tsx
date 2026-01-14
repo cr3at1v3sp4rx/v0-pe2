@@ -2,19 +2,27 @@
 
 import { useState, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
 
-export default function Home() {
+export default function HomePage() {
   const router = useRouter()
+  const supabase = createClient()
 
   useEffect(() => {
-    // Check if user has seen onboarding
-    const hasSeenOnboarding = localStorage.getItem("onboarding-complete")
-    if (hasSeenOnboarding) {
-      router.replace("/dashboard")
-    } else {
-      router.replace("/onboarding")
+    const checkAuth = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (user) {
+        router.replace("/dashboard")
+      } else {
+        router.replace("/auth/login")
+      }
     }
-  }, [router])
+
+    checkAuth()
+  }, [router, supabase])
 
   const [mobileView, setMobileView] = useState<"sections" | "edit" | "preview">("edit")
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
