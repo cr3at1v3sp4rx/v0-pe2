@@ -11,6 +11,7 @@ import { MobileNav } from "@/components/editor/mobile-nav"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { PanelLeft, PanelLeftClose, Undo2, Redo2, Loader2 } from "lucide-react"
+import { createProposal, updateProposal, createSection } from "@/lib/supabase/queries"
 
 export default function EditorPage() {
   const searchParams = useSearchParams()
@@ -31,54 +32,62 @@ export default function EditorPage() {
   const [showTemplates, setShowTemplates] = useState(false)
   const [previewMode, setPreviewMode] = useState(false)
   const [isTransitioning, setIsTransitioning] = useState(false)
+  const [proposalId, setProposalId] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
-    if (importId) {
-      const storedData = sessionStorage.getItem(`proposal-import-${importId}`)
-      if (storedData) {
-        try {
-          const {
-            sections: importedSections,
-            designSettings: importedSettings,
-            templateName: importedName,
-          } = JSON.parse(storedData)
-          setSections(importedSections)
-          setDesignSettings(
-            importedSettings || {
-              accentColor: "#1e40af",
-              coverStyle: "gradient",
-              typography: "modern",
-            },
-          )
-          setTemplateName(importedName)
-          setSelectedSection(importedSections[0] || null)
-          setHistory([importedSections])
-          setHistoryIndex(0)
-
-          sessionStorage.removeItem(`proposal-import-${importId}`)
-        } catch (err) {
-          console.error("[v0] Error loading imported proposal:", err)
+    const loadProposal = async () => {
+      // Check if this is a new proposal or loading existing one
+      if (importId) {
+        // Load from sessionStorage (PDF import)
+        const storedData = sessionStorage.getItem(`proposal-import-${importId}`)
+        if (storedData) {
+          try {
+            const {
+              sections: importedSections,
+              designSettings: importedSettings,
+              templateName: importedName,
+            } = JSON.parse(storedData)
+            setSections(importedSections)
+            setDesignSettings(
+              importedSettings || {
+                accentColor: "#1e40af",
+                coverStyle: "gradient",
+                typography: "modern",
+              },
+            )
+            setTemplateName(importedName)
+            setSelectedSection(importedSections[0] || null)
+            setHistory([importedSections])
+            setHistoryIndex(0)
+            sessionStorage.removeItem(`proposal-import-${importId}`)
+          } catch (err) {
+            console.error("[v0] Error loading imported proposal:", err)
+          }
         }
-      }
-    } else {
-      const defaultSections = [
-        {
-          id: "1",
-          type: "cover",
-          title: "Cover Page",
-          content: {
-            companyName: "Your Company",
-            clientName: "Client Name",
-            projectTitle: "Project Title",
-            subtitle: "Proposal Overview",
+      } else {
+        // Start with default blank proposal
+        const defaultSections = [
+          {
+            id: "1",
+            type: "cover",
+            title: "Cover Page",
+            content: {
+              companyName: "Your Company",
+              clientName: "Client Name",
+              projectTitle: "Project Title",
+              subtitle: "Proposal Overview",
+            },
           },
-        },
-      ]
-      setSections(defaultSections)
-      setSelectedSection(defaultSections[0])
-      setHistory([defaultSections])
-      setHistoryIndex(0)
+        ]
+        setSections(defaultSections)
+        setSelectedSection(defaultSections[0])
+        setHistory([defaultSections])
+        setHistoryIndex(0)
+      }
     }
+
+    loadProposal()
   }, [importId])
 
   const handleUndo = () => {
@@ -191,6 +200,38 @@ export default function EditorPage() {
     window.open(viewUrl, "_blank")
   }
 
+  const handleSaveProposal = async () => {
+    if (!templateName.trim()) {
+      alert("Please enter a proposal name")
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      if (!proposalId) {
+        // Create new proposal
+        const newProposal = await createProposal(templateName, "", "")
+        setProposalId(newProposal.id)
+
+        // Save sections
+        for (let i = 0; i < sections.length; i++) {
+          const section = sections[i]
+          await createSection(newProposal.id, section.type, section.title, section.content, i)
+        }
+      } else {
+        // Update existing proposal
+        await updateProposal(proposalId, { title: templateName })
+        // TODO: Update sections
+      }
+      alert("Proposal saved successfully!")
+    } catch (error) {
+      console.error("[v0] Error saving proposal:", error)
+      alert("Error saving proposal")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background flex flex-col overflow-hidden">
       {/* Header */}
@@ -201,7 +242,9 @@ export default function EditorPage() {
         onShowTemplates={() => setShowTemplates(true)}
         onSaveTemplate={handleSaveTemplate}
         onOpenClientView={handleOpenClientView}
-        proposalId={"proposal-" + Math.random().toString(36).substr(2, 9)}
+        proposalId={proposalId}
+        onSaveProposal={handleSaveProposal}
+        isSaving={isSaving}
       />
 
       {/* Main Editor Area */}

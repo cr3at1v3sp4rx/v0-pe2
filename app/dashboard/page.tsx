@@ -8,8 +8,8 @@ import { FileUp, FileText, TrendingUp, Clock, CheckCircle2, Zap } from "lucide-r
 import Link from "next/link"
 import dynamic from "next/dynamic"
 import { Skeleton } from "@/components/ui/skeleton"
-import { getEngagementSignals } from "@/lib/shareable-links"
 import { EngagementSignals } from "@/components/proposal/engagement-signals"
+import { getProposals } from "@/lib/supabase/queries"
 
 const PDFUploadDialog = dynamic(
   () => import("@/components/pdf/pdf-upload-dialog").then((mod) => ({ default: mod.PDFUploadDialog })),
@@ -22,32 +22,40 @@ export default function Dashboard() {
   const router = useRouter()
   const [showPDFUpload, setShowPDFUpload] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  const [recentProposals, setRecentProposals] = useState([
-    { id: 1, name: "Q4 Website Redesign", date: "2 days ago", status: "accepted", signals: null },
-    {
-      id: 2,
-      name: "Mobile App Development",
-      date: "1 week ago",
-      status: "pending",
-      signals: null,
-    },
-    {
-      id: 3,
-      name: "Brand Strategy Consultation",
-      date: "2 weeks ago",
-      status: "accepted",
-      signals: null,
-    },
-  ])
+  const [recentProposals, setRecentProposals] = useState<any[]>([])
+  const [stats, setStats] = useState({
+    total: 0,
+    accepted: 0,
+    pending: 0,
+    totalValue: "$0",
+  })
 
   useEffect(() => {
-    setRecentProposals((proposals) =>
-      proposals.map((proposal) => ({
-        ...proposal,
-        signals: getEngagementSignals(proposal.id.toString()),
-      })),
-    )
-    setIsLoading(false)
+    const loadProposals = async () => {
+      try {
+        const proposals = await getProposals()
+        setRecentProposals(proposals || [])
+
+        // Calculate stats
+        const accepted = (proposals || []).filter((p: any) => p.status === "accepted").length
+        const pending = (proposals || []).filter((p: any) => p.status === "draft" || p.status === "pending").length
+        const totalValue = (proposals || [])
+          .reduce((acc, p) => acc + (p.value ? parseFloat(p.value.replace("$", "").replace("K", "000")) : 0), 0)
+          .toLocaleString("en-US", { style: "currency", currency: "USD" })
+        setStats({
+          total: proposals?.length || 0,
+          accepted,
+          pending,
+          totalValue,
+        })
+      } catch (error) {
+        console.error("[v0] Error loading proposals:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadProposals()
   }, [])
 
   const handlePDFUploadComplete = (sections: any[], templateName: string) => {
@@ -181,7 +189,7 @@ export default function Dashboard() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl sm:text-3xl font-bold text-foreground">24</div>
+                    <div className="text-2xl sm:text-3xl font-bold text-foreground">{stats.total}</div>
                     <p className="text-xs text-muted-foreground mt-1">+3 this month</p>
                   </CardContent>
                 </Card>
@@ -194,7 +202,7 @@ export default function Dashboard() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl sm:text-3xl font-bold text-foreground">18</div>
+                    <div className="text-2xl sm:text-3xl font-bold text-foreground">{stats.accepted}</div>
                     <p className="text-xs text-muted-foreground mt-1">75% acceptance rate</p>
                   </CardContent>
                 </Card>
@@ -207,7 +215,7 @@ export default function Dashboard() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl sm:text-3xl font-bold text-foreground">4</div>
+                    <div className="text-2xl sm:text-3xl font-bold text-foreground">{stats.pending}</div>
                     <p className="text-xs text-muted-foreground mt-1">Awaiting response</p>
                   </CardContent>
                 </Card>
@@ -220,7 +228,7 @@ export default function Dashboard() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl sm:text-3xl font-bold text-foreground">$285K</div>
+                    <div className="text-2xl sm:text-3xl font-bold text-foreground">{stats.totalValue}</div>
                     <p className="text-xs text-muted-foreground mt-1">All time</p>
                   </CardContent>
                 </Card>

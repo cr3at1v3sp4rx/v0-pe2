@@ -7,91 +7,67 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ArrowLeft, Download, Share2 } from "lucide-react"
 import { AnalyticsDashboard } from "@/components/analytics/analytics-dashboard"
 import { IntelligenceInsights } from "@/components/analytics/intelligence-insights"
-import { getEngagementSignals } from "@/lib/shareable-links"
-import { EngagementSignals } from "@/components/proposal/engagement-signals"
-
-// Mock proposal data - in a real app, this would come from a database
-const proposalsData: Record<number, any> = {
-  1: {
-    id: 1,
-    name: "Q4 Website Redesign",
-    client: "Acme Corporation",
-    date: "2 days ago",
-    status: "accepted",
-    value: "$45,000",
-    description: "Complete website redesign and implementation",
-    sections: [
-      { title: "Executive Summary", content: "A comprehensive website redesign project..." },
-      { title: "Project Scope", content: "We will redesign and implement a modern website..." },
-      { title: "Timeline", content: "Project duration: 12 weeks" },
-      { title: "Pricing", content: "$45,000 total investment" },
-    ],
-  },
-  2: {
-    id: 2,
-    name: "Mobile App Development",
-    client: "TechStart Inc",
-    date: "1 week ago",
-    status: "pending",
-    value: "$85,000",
-    description: "Native iOS and Android mobile application",
-    sections: [
-      { title: "Executive Summary", content: "Development of a native mobile application..." },
-      { title: "Project Scope", content: "iOS and Android applications with backend..." },
-      { title: "Timeline", content: "Project duration: 20 weeks" },
-      { title: "Pricing", content: "$85,000 total investment" },
-    ],
-  },
-  3: {
-    id: 3,
-    name: "Brand Strategy Consultation",
-    client: "StartupXYZ",
-    date: "2 weeks ago",
-    status: "accepted",
-    value: "$15,000",
-    description: "Strategic brand positioning and identity design",
-    sections: [
-      { title: "Executive Summary", content: "Brand strategy consultation and development..." },
-      { title: "Project Scope", content: "Brand positioning, identity design, guidelines..." },
-      { title: "Timeline", content: "Project duration: 6 weeks" },
-      { title: "Pricing", content: "$15,000 total investment" },
-    ],
-  },
-}
+import { getProposal, getProposalSections, getProposalAnalytics } from "@/lib/supabase/queries"
 
 export const dynamic = "force-dynamic"
 
 export default function ProposalDetailPage() {
   const params = useParams()
   const router = useRouter()
-  const proposalId = Number(params.id)
-  const proposal = proposalsData[proposalId]
+  const proposalId = params.id as string
+
+  const [proposal, setProposal] = useState<any>(null)
+  const [sections, setSections] = useState<any[]>([])
+  const [analytics, setAnalytics] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState<"overview" | "analytics">("overview")
-  const [shareLinks, setShareLinks] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const links = JSON.parse(localStorage.getItem("shareLinks") || "{}")
-    const proposalLinks = Object.values(links).filter((link: any) => link.proposalId === proposalId)
-    setShareLinks(proposalLinks)
+    const loadProposalData = async () => {
+      try {
+        const [proposalData, sectionsData, analyticsData] = await Promise.all([
+          getProposal(proposalId),
+          getProposalSections(proposalId),
+          getProposalAnalytics(proposalId),
+        ])
+
+        setProposal(proposalData)
+        setSections(sectionsData || [])
+        setAnalytics(analyticsData || [])
+      } catch (err) {
+        console.error("[v0] Error loading proposal:", err)
+        setError("Failed to load proposal")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    if (proposalId) {
+      loadProposalData()
+    }
   }, [proposalId])
 
-  const signals = getEngagementSignals(proposalId)
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/20 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-accent/10 mb-4 animate-pulse">
+            <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+          </div>
+          <p className="text-muted-foreground">Loading proposal...</p>
+        </div>
+      </div>
+    )
+  }
 
-  const mockEngagement = [
-    { sectionTitle: "Cover Page", viewCount: 12, totalTimeSpent: 240, revisitCount: 2, popularity: "high" },
-    { sectionTitle: "Executive Summary", viewCount: 11, totalTimeSpent: 450, revisitCount: 1, popularity: "high" },
-    { sectionTitle: "Project Scope", viewCount: 9, totalTimeSpent: 320, revisitCount: 3, popularity: "medium" },
-    { sectionTitle: "Pricing", viewCount: 12, totalTimeSpent: 600, revisitCount: 4, popularity: "high" },
-    { sectionTitle: "Timeline", viewCount: 6, totalTimeSpent: 180, revisitCount: 0, popularity: "low" },
-  ]
-
-  if (!proposal) {
+  if (error || !proposal) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/20 flex items-center justify-center px-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <CardTitle>Proposal Not Found</CardTitle>
-            <CardDescription>The proposal you're looking for doesn't exist.</CardDescription>
+            <CardDescription>{error || "The proposal you're looking for doesn't exist."}</CardDescription>
           </CardHeader>
           <CardContent>
             <Button onClick={() => router.back()} className="w-full">
@@ -114,12 +90,11 @@ export default function ProposalDetailPage() {
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-foreground">{proposal.name}</h1>
-                <p className="text-sm text-muted-foreground">{proposal.client}</p>
+                <h1 className="text-xl sm:text-2xl font-bold text-foreground">{proposal.title}</h1>
+                <p className="text-sm text-muted-foreground">{proposal.client_name}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {signals.length > 0 && <EngagementSignals signals={signals} compact={true} />}
               <Button variant="outline" size="sm" className="gap-2 bg-transparent">
                 <Download className="w-4 h-4" />
                 <span className="hidden sm:inline">Download</span>
@@ -138,7 +113,7 @@ export default function ProposalDetailPage() {
         {/* Proposal Info - Hide on mobile */}
         <div className="mb-8 hidden md:block">
           <h2 className="text-lg font-semibold text-muted-foreground mb-4">PROPOSAL INSIGHTS</h2>
-          <IntelligenceInsights sectionEngagement={mockEngagement} />
+          <IntelligenceInsights sectionEngagement={sections} />
         </div>
 
         {/* Tabs */}
@@ -178,12 +153,18 @@ export default function ProposalDetailPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-6">
-                    {proposal.sections.map((section: any, index: number) => (
-                      <div key={index} className="space-y-2 animate-fade-in">
-                        <h3 className="text-lg font-semibold text-foreground">{section.title}</h3>
-                        <p className="text-muted-foreground leading-relaxed">{section.content}</p>
-                      </div>
-                    ))}
+                    {sections.length > 0 ? (
+                      sections.map((section: any) => (
+                        <div key={section.id} className="space-y-2 animate-fade-in">
+                          <h3 className="text-lg font-semibold text-foreground">{section.title}</h3>
+                          <p className="text-muted-foreground leading-relaxed">
+                            {typeof section.content === "string" ? section.content : JSON.stringify(section.content)}
+                          </p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-muted-foreground">No sections in this proposal yet.</p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -204,17 +185,15 @@ export default function ProposalDetailPage() {
                 <CardDescription>Track how your client interacted with this proposal</CardDescription>
               </CardHeader>
               <CardContent>
-                <AnalyticsDashboard proposalData={proposal} sectionData={mockEngagement} />
+                {analytics.length > 0 ? (
+                  <AnalyticsDashboard proposalData={proposal} sectionData={sections} />
+                ) : (
+                  <p className="text-muted-foreground text-center py-8">No analytics data available yet.</p>
+                )}
               </CardContent>
             </Card>
           )}
         </div>
-
-        {signals.length > 0 && (
-          <div className="mb-6 animate-fade-in">
-            <EngagementSignals signals={signals} compact={false} />
-          </div>
-        )}
       </div>
     </div>
   )
