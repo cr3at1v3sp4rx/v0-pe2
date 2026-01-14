@@ -71,8 +71,8 @@ interface Section {
 
 interface EditorSidebarProps {
   sections: Section[]
-  selectedSectionId: string
-  onSelectSection: (id: string) => void
+  selectedSectionId: string | null
+  onSelectSection: (section: Section) => void
   onAddSection: (type: string) => void
   onRemoveSection: (id: string) => void
   onReorderSections?: (sections: Section[]) => void
@@ -210,7 +210,7 @@ export function EditorSidebar({
             style={{ animationDelay: `${index * 50}ms` }}
           >
             <Card
-              onClick={() => onSelectSection(section.id)}
+              onClick={() => onSelectSection(section)}
               className={`p-4 cursor-pointer transition-smooth active:scale-[0.98] ${
                 selectedSectionId === section.id
                   ? "bg-primary text-primary-foreground border-primary shadow-md ring-2 ring-primary/20"

@@ -31,7 +31,9 @@ interface EditorHeaderProps {
   onShowTemplates: () => void
   onSaveTemplate: () => void
   onOpenClientView: () => void
-  proposalId: string
+  proposalId: string | null
+  onSaveProposal: () => Promise<void>
+  isSaving: boolean
 }
 
 export function EditorHeader({
@@ -42,6 +44,8 @@ export function EditorHeader({
   onSaveTemplate,
   onOpenClientView,
   proposalId,
+  onSaveProposal,
+  isSaving,
 }: EditorHeaderProps) {
   const [copied, setCopied] = useState(false)
 
@@ -79,9 +83,9 @@ export function EditorHeader({
           <FileText className="w-4 h-4" />
           Templates
         </Button>
-        <Button variant="outline" onClick={onSaveTemplate} className="gap-2 bg-transparent h-11">
+        <Button variant="outline" onClick={onSaveProposal} disabled={isSaving} className="gap-2 bg-transparent h-11">
           <Save className="w-4 h-4" />
-          Save
+          {isSaving ? "Saving..." : "Save"}
         </Button>
         <Button variant="outline" onClick={() => onPreviewToggle(!previewMode)} className="gap-2 h-11">
           {previewMode ? (
@@ -145,9 +149,9 @@ export function EditorHeader({
             <FileText className="w-4 h-4" />
             Templates
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={onSaveTemplate} className="gap-2 py-3">
+          <DropdownMenuItem onClick={onSaveProposal} disabled={isSaving} className="gap-2 py-3">
             <Save className="w-4 h-4" />
-            Save as Template
+            {isSaving ? "Saving..." : "Save Proposal"}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={onOpenClientView} className="gap-2 py-3">

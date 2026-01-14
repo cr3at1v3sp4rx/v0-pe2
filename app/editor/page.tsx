@@ -20,6 +20,7 @@ export default function EditorPage() {
   const [mobileView, setMobileView] = useState("edit")
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [selectedSection, setSelectedSection] = useState<any>(null)
+  const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null)
   const [historyIndex, setHistoryIndex] = useState(0)
   const [history, setHistory] = useState<any[]>([])
   const [designSettings, setDesignSettings] = useState({
@@ -58,6 +59,7 @@ export default function EditorPage() {
             )
             setTemplateName(importedName)
             setSelectedSection(importedSections[0] || null)
+            setSelectedSectionId(importedSections[0]?.id || null)
             setHistory([importedSections])
             setHistoryIndex(0)
             sessionStorage.removeItem(`proposal-import-${importId}`)
@@ -82,6 +84,7 @@ export default function EditorPage() {
         ]
         setSections(defaultSections)
         setSelectedSection(defaultSections[0])
+        setSelectedSectionId(defaultSections[0].id)
         setHistory([defaultSections])
         setHistoryIndex(0)
       }
@@ -95,6 +98,7 @@ export default function EditorPage() {
       setHistoryIndex(historyIndex - 1)
       setSections(history[historyIndex - 1])
       setSelectedSection(history[historyIndex - 1][0] || null)
+      setSelectedSectionId(history[historyIndex - 1][0]?.id || null)
     }
   }
 
@@ -103,6 +107,7 @@ export default function EditorPage() {
       setHistoryIndex(historyIndex + 1)
       setSections(history[historyIndex + 1])
       setSelectedSection(history[historyIndex + 1][0] || null)
+      setSelectedSectionId(history[historyIndex + 1][0]?.id || null)
     }
   }
 
@@ -143,6 +148,7 @@ export default function EditorPage() {
     const newSections = [...sections, newSection]
     setSections(newSections)
     setSelectedSection(newSection)
+    setSelectedSectionId(newSection.id)
     setHistory([...history.slice(0, historyIndex + 1), newSections])
     setHistoryIndex(history.length)
   }
@@ -150,18 +156,35 @@ export default function EditorPage() {
   const handleDeleteSection = (sectionId: string) => {
     const newSections = sections.filter((s) => s.id !== sectionId)
     setSections(newSections)
-    setSelectedSection(newSections[0] || null)
+    if (selectedSectionId === sectionId) {
+      setSelectedSection(newSections[0] || null)
+      setSelectedSectionId(newSections[0]?.id || null)
+    }
     setHistory([...history.slice(0, historyIndex + 1), newSections])
     setHistoryIndex(history.length)
   }
 
-  const handleReorderSections = (fromIndex: number, toIndex: number) => {
-    const newSections = [...sections]
-    const [removed] = newSections.splice(fromIndex, 1)
-    newSections.splice(toIndex, 0, removed)
-    setSections(newSections)
-    setHistory([...history.slice(0, historyIndex + 1), newSections])
+  const handleReorderSections = (reorderedSections: any[]) => {
+    setSections(reorderedSections)
+    setHistory([...history.slice(0, historyIndex + 1), reorderedSections])
     setHistoryIndex(history.length)
+  }
+
+  const handleDuplicateSection = (sectionId: string) => {
+    const sectionToDuplicate = sections.find((s) => s.id === sectionId)
+    if (sectionToDuplicate) {
+      const duplicated = {
+        ...sectionToDuplicate,
+        id: String(Date.now()),
+        title: `${sectionToDuplicate.title} (Copy)`,
+      }
+      const newSections = [...sections, duplicated]
+      setSections(newSections)
+      setSelectedSection(duplicated)
+      setSelectedSectionId(duplicated.id)
+      setHistory([...history.slice(0, historyIndex + 1), newSections])
+      setHistoryIndex(history.length)
+    }
   }
 
   const updateSection = (sectionId: string, updates: any) => {
@@ -178,6 +201,7 @@ export default function EditorPage() {
   const handleSelectSection = (section: any) => {
     setIsTransitioning(true)
     setSelectedSection(section)
+    setSelectedSectionId(section.id)
     setTimeout(() => setIsTransitioning(false), 50)
   }
 
@@ -255,12 +279,13 @@ export default function EditorPage() {
         >
           <EditorSidebar
             sections={sections}
-            selectedSection={selectedSection}
+            selectedSectionId={selectedSectionId}
             onSelectSection={handleSelectSection}
             onAddSection={handleAddSection}
-            onDeleteSection={handleDeleteSection}
+            onRemoveSection={handleDeleteSection}
             onReorderSections={handleReorderSections}
-            collapsed={sidebarCollapsed}
+            onDuplicateSection={handleDuplicateSection}
+            isMobile={false}
           />
         </div>
 
@@ -358,11 +383,13 @@ export default function EditorPage() {
               <div className="flex-1 overflow-hidden">
                 <EditorSidebar
                   sections={sections}
-                  selectedSection={selectedSection}
+                  selectedSectionId={selectedSectionId}
                   onSelectSection={handleSelectSection}
                   onAddSection={handleAddSection}
-                  onDeleteSection={handleDeleteSection}
+                  onRemoveSection={handleDeleteSection}
                   onReorderSections={handleReorderSections}
+                  onDuplicateSection={handleDuplicateSection}
+                  isMobile={true}
                 />
               </div>
             )}
@@ -414,6 +441,7 @@ export default function EditorPage() {
                         setDesignSettings(template.designSettings)
                         setTemplateName(template.name)
                         setSelectedSection(template.sections[0] || null)
+                        setSelectedSectionId(template.sections[0]?.id || null)
                         setShowTemplates(false)
                       }}
                       className="w-full bg-transparent hover:bg-accent/10 h-9 transition-colors duration-150"
