@@ -28,6 +28,19 @@ export function ProposalEditor({ section, onUpdate }: ProposalEditorProps) {
     )
   }
 
+  const renderSectionTitle = () => (
+    <div className="pb-4 mb-4 border-b border-border">
+      <Label className="text-sm font-medium mb-2 block">Section Title</Label>
+      <Input
+        value={section.title}
+        onChange={(e) => onUpdate({ title: e.target.value })}
+        placeholder="e.g. Services, Overview, Team..."
+        className="h-12 text-base font-semibold"
+      />
+      <p className="text-xs text-muted-foreground mt-1.5">This title appears in the proposal</p>
+    </div>
+  )
+
   const renderEditor = () => {
     switch (section.type) {
       case "cover":
@@ -564,6 +577,234 @@ export function ProposalEditor({ section, onUpdate }: ProposalEditorProps) {
           </div>
         )
 
+      case "timeline":
+        return (
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-medium mb-2 block">Timeline</Label>
+              <p className="text-xs text-muted-foreground mb-3">Define project milestones and delivery dates</p>
+              <div className="space-y-3">
+                {(section.content.milestones || []).map((milestone: any, idx: number) => (
+                  <Card key={idx} className="p-4 space-y-3 border-border">
+                    <Input
+                      value={milestone.title}
+                      onChange={(e) => {
+                        const updated = [...(section.content.milestones || [])]
+                        updated[idx].title = e.target.value
+                        onUpdate({
+                          content: { ...section.content, milestones: updated },
+                        })
+                      }}
+                      placeholder="Milestone title"
+                      className="h-12 text-base font-medium"
+                    />
+                    <Input
+                      value={milestone.date}
+                      onChange={(e) => {
+                        const updated = [...(section.content.milestones || [])]
+                        updated[idx].date = e.target.value
+                        onUpdate({
+                          content: { ...section.content, milestones: updated },
+                        })
+                      }}
+                      placeholder="Date (e.g., Q1 2025)"
+                      className="h-10 text-sm"
+                    />
+                    <Textarea
+                      value={milestone.description || ""}
+                      onChange={(e) => {
+                        const updated = [...(section.content.milestones || [])]
+                        updated[idx].description = e.target.value
+                        onUpdate({
+                          content: { ...section.content, milestones: updated },
+                        })
+                      }}
+                      placeholder="Milestone description..."
+                      rows={2}
+                      className="text-sm resize-none"
+                    />
+                    <Button
+                      variant="ghost"
+                      className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 h-10"
+                      onClick={() => {
+                        const updated = section.content.milestones.filter((_: any, i: number) => i !== idx)
+                        onUpdate({
+                          content: { ...section.content, milestones: updated },
+                        })
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Remove Milestone
+                    </Button>
+                  </Card>
+                ))}
+              </div>
+              <Button
+                variant="outline"
+                className="mt-3 w-full bg-transparent h-12"
+                onClick={() => {
+                  const updated = [
+                    ...(section.content.milestones || []),
+                    { title: "New Milestone", date: "", description: "" },
+                  ]
+                  onUpdate({
+                    content: { ...section.content, milestones: updated },
+                  })
+                }}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Milestone
+              </Button>
+            </div>
+          </div>
+        )
+
+      case "team":
+        return (
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-medium mb-2 block">Team Members</Label>
+              <p className="text-xs text-muted-foreground mb-3">Introduce your team and their expertise</p>
+              <div className="space-y-3">
+                {(section.content.members || []).map((member: any, idx: number) => (
+                  <Card key={idx} className="p-4 space-y-3 border-border">
+                    <Input
+                      value={member.name}
+                      onChange={(e) => {
+                        const updated = [...(section.content.members || [])]
+                        updated[idx].name = e.target.value
+                        onUpdate({
+                          content: { ...section.content, members: updated },
+                        })
+                      }}
+                      placeholder="Team member name"
+                      className="h-12 text-base font-medium"
+                    />
+                    <Input
+                      value={member.role}
+                      onChange={(e) => {
+                        const updated = [...(section.content.members || [])]
+                        updated[idx].role = e.target.value
+                        onUpdate({
+                          content: { ...section.content, members: updated },
+                        })
+                      }}
+                      placeholder="Role/Title"
+                      className="h-10 text-sm"
+                    />
+                    <Textarea
+                      value={member.bio || ""}
+                      onChange={(e) => {
+                        const updated = [...(section.content.members || [])]
+                        updated[idx].bio = e.target.value
+                        onUpdate({
+                          content: { ...section.content, members: updated },
+                        })
+                      }}
+                      placeholder="Brief bio or expertise..."
+                      rows={2}
+                      className="text-sm resize-none"
+                    />
+                    <Button
+                      variant="ghost"
+                      className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 h-10"
+                      onClick={() => {
+                        const updated = section.content.members.filter((_: any, i: number) => i !== idx)
+                        onUpdate({
+                          content: { ...section.content, members: updated },
+                        })
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Remove Member
+                    </Button>
+                  </Card>
+                ))}
+              </div>
+              <Button
+                variant="outline"
+                className="mt-3 w-full bg-transparent h-12"
+                onClick={() => {
+                  const updated = [...(section.content.members || []), { name: "New Member", role: "", bio: "" }]
+                  onUpdate({
+                    content: { ...section.content, members: updated },
+                  })
+                }}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Team Member
+              </Button>
+            </div>
+          </div>
+        )
+
+      case "terms":
+        return (
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-medium mb-2 block">Terms & Conditions</Label>
+              <p className="text-xs text-muted-foreground mb-3">Add contract terms, conditions, and agreements</p>
+              <div className="space-y-3">
+                {(section.content.terms || []).map((term: any, idx: number) => (
+                  <Card key={idx} className="p-4 space-y-3 border-border">
+                    <Input
+                      value={term.title}
+                      onChange={(e) => {
+                        const updated = [...(section.content.terms || [])]
+                        updated[idx].title = e.target.value
+                        onUpdate({
+                          content: { ...section.content, terms: updated },
+                        })
+                      }}
+                      placeholder="Term title"
+                      className="h-12 text-base font-medium"
+                    />
+                    <Textarea
+                      value={term.description || ""}
+                      onChange={(e) => {
+                        const updated = [...(section.content.terms || [])]
+                        updated[idx].description = e.target.value
+                        onUpdate({
+                          content: { ...section.content, terms: updated },
+                        })
+                      }}
+                      placeholder="Term description..."
+                      rows={3}
+                      className="text-sm resize-none"
+                    />
+                    <Button
+                      variant="ghost"
+                      className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 h-10"
+                      onClick={() => {
+                        const updated = section.content.terms.filter((_: any, i: number) => i !== idx)
+                        onUpdate({
+                          content: { ...section.content, terms: updated },
+                        })
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Remove Term
+                    </Button>
+                  </Card>
+                ))}
+              </div>
+              <Button
+                variant="outline"
+                className="mt-3 w-full bg-transparent h-12"
+                onClick={() => {
+                  const updated = [...(section.content.terms || []), { title: "New Term", description: "" }]
+                  onUpdate({
+                    content: { ...section.content, terms: updated },
+                  })
+                }}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Term
+              </Button>
+            </div>
+          </div>
+        )
+
       case "overview":
       case "custom":
         return (
@@ -605,15 +846,7 @@ export function ProposalEditor({ section, onUpdate }: ProposalEditorProps) {
   return (
     <Card className="flex-1 p-4 md:p-6 overflow-y-auto">
       <div className="space-y-5 max-w-2xl">
-        <div>
-          <Label className="text-sm font-medium mb-2 block">Section Title</Label>
-          <Input
-            value={section.title}
-            onChange={(e) => onUpdate({ title: e.target.value })}
-            placeholder="Section title"
-            className="text-lg font-semibold h-12"
-          />
-        </div>
+        {renderSectionTitle()}
         <div className="border-t border-border pt-5">{renderEditor()}</div>
       </div>
     </Card>

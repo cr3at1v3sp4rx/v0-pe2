@@ -4,12 +4,13 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useRouter } from "next/navigation"
-import { FileUp, FileText, TrendingUp, Clock, CheckCircle2, Zap } from "lucide-react"
+import { FileUp, FileText, TrendingUp, Clock, CheckCircle2, Zap, LogOut, Settings } from "lucide-react"
 import Link from "next/link"
 import dynamic from "next/dynamic"
 import { Skeleton } from "@/components/ui/skeleton"
 import { EngagementSignals } from "@/components/proposal/engagement-signals"
 import { getProposals } from "@/lib/supabase/queries"
+import { createBrowserClient } from "@supabase/ssr"
 
 const PDFUploadDialog = dynamic(
   () => import("@/components/pdf/pdf-upload-dialog").then((mod) => ({ default: mod.PDFUploadDialog })),
@@ -22,6 +23,7 @@ export default function Dashboard() {
   const router = useRouter()
   const [showPDFUpload, setShowPDFUpload] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [recentProposals, setRecentProposals] = useState<any[]>([])
   const [stats, setStats] = useState({
     total: 0,
@@ -40,7 +42,7 @@ export default function Dashboard() {
         const accepted = (proposals || []).filter((p: any) => p.status === "accepted").length
         const pending = (proposals || []).filter((p: any) => p.status === "draft" || p.status === "pending").length
         const totalValue = (proposals || [])
-          .reduce((acc, p) => acc + (p.value ? parseFloat(p.value.replace("$", "").replace("K", "000")) : 0), 0)
+          .reduce((acc, p) => acc + (p.value ? Number.parseFloat(p.value.replace("$", "").replace("K", "000")) : 0), 0)
           .toLocaleString("en-US", { style: "currency", currency: "USD" })
         setStats({
           total: proposals?.length || 0,
@@ -76,6 +78,22 @@ export default function Dashboard() {
     router.push(`/editor?import=${proposalId}`)
   }
 
+  const handleLogout = async () => {
+    try {
+      setIsLoggingOut(true)
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      )
+      await supabase.auth.signOut()
+      router.push("/auth/login")
+    } catch (error) {
+      console.error("[v0] Error logging out:", error)
+    } finally {
+      setIsLoggingOut(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/20 flex flex-col">
       {/* Header */}
@@ -88,11 +106,24 @@ export default function Dashboard() {
                 Create stunning proposals in minutes
               </p>
             </div>
-            <Link href="/settings">
-              <Button variant="outline" size="sm" className="shrink-0 bg-transparent">
-                Settings
+            <div className="flex items-center gap-2 shrink-0">
+              <Link href="/settings">
+                <Button variant="outline" size="sm" className="shrink-0 bg-transparent gap-2">
+                  <Settings className="w-4 h-4" />
+                  <span className="hidden sm:inline">Settings</span>
+                </Button>
+              </Link>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+                className="shrink-0 bg-transparent gap-2"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="hidden sm:inline">{isLoggingOut ? "Logging out..." : "Logout"}</span>
               </Button>
-            </Link>
+            </div>
           </div>
         </div>
       </div>

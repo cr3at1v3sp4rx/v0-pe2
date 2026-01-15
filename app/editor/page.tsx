@@ -11,7 +11,14 @@ import { MobileNav } from "@/components/editor/mobile-nav"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { PanelLeft, PanelLeftClose, Undo2, Redo2, Loader2 } from "lucide-react"
-import { createProposal, updateProposal, createSection } from "@/lib/supabase/queries"
+import {
+  createProposal,
+  updateProposal,
+  createSection,
+  createTemplate,
+  getTemplates,
+  deleteTemplate,
+} from "@/lib/supabase/queries"
 
 export default function EditorPage() {
   const searchParams = useSearchParams()
@@ -35,6 +42,7 @@ export default function EditorPage() {
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [proposalId, setProposalId] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [templates, setTemplates] = useState<any[]>([])
 
   useEffect(() => {
     const loadProposal = async () => {
@@ -93,6 +101,18 @@ export default function EditorPage() {
     loadProposal()
   }, [importId])
 
+  useEffect(() => {
+    const loadTemplates = async () => {
+      try {
+        const loadedTemplates = await getTemplates()
+        setTemplates(loadedTemplates)
+      } catch (err) {
+        console.error("[v0] Error loading templates:", err)
+      }
+    }
+    loadTemplates()
+  }, [])
+
   const handleUndo = () => {
     if (historyIndex > 0) {
       setHistoryIndex(historyIndex - 1)
@@ -116,17 +136,9 @@ export default function EditorPage() {
   }
 
   const handleAddSection = (type: string) => {
-    const sectionTypes: { [key: string]: any } = {
-      cover: {
-        type: "cover",
-        content: {
-          companyName: "Your Company",
-          clientName: "Client Name",
-          projectTitle: "Project Title",
-          subtitle: "Proposal Overview",
-        },
-      },
-      overview: { type: "overview", content: { text: "Add your overview text here..." } },
+    const sectionTypes: any = {
+      cover: { type: "cover", content: { companyName: "", clientName: "", projectTitle: "", subtitle: "" } },
+      overview: { type: "overview", content: { text: "Project overview content..." } },
       services: { type: "services", content: { items: ["Service 1", "Service 2"] } },
       pricing: { type: "pricing", content: { packages: [{ name: "Package", price: "$0", description: "" }] } },
       mindmap: { type: "mindmap", content: { centralTopic: "Topic", branches: [] } },
@@ -136,6 +148,9 @@ export default function EditorPage() {
         content: { optionA: { name: "Option A", features: [] }, optionB: { name: "Option B", features: [] } },
       },
       features: { type: "features", content: { features: [] } },
+      timeline: { type: "timeline", content: { milestones: [] } },
+      team: { type: "team", content: { members: [] } },
+      terms: { type: "terms", content: { terms: [] } },
       custom: { type: "custom", content: { text: "Custom content" } },
     }
 
@@ -205,17 +220,23 @@ export default function EditorPage() {
     setTimeout(() => setIsTransitioning(false), 50)
   }
 
-  const handleSaveTemplate = () => {
-    const template = {
-      name: templateName,
-      sections,
-      designSettings,
-      createdAt: new Date().toISOString(),
+  const handleSaveTemplate = async () => {
+    if (!templateName.trim()) {
+      alert("Please enter a template name")
+      return
     }
-    const savedTemplates = JSON.parse(localStorage.getItem("proposal-templates") || "[]")
-    savedTemplates.push(template)
-    localStorage.setItem("proposal-templates", JSON.stringify(savedTemplates))
-    alert(`Template "${templateName}" saved successfully!`)
+
+    setIsSaving(true)
+    try {
+      const newTemplate = await createTemplate(templateName, "", sections, designSettings)
+      setTemplates([...templates, newTemplate])
+      alert(`Template "${templateName}" saved successfully!`)
+    } catch (err) {
+      console.error("[v0] Error saving template:", err)
+      alert("Failed to save template. Please try again.")
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleOpenClientView = () => {
@@ -256,6 +277,31 @@ export default function EditorPage() {
     }
   }
 
+  const handleLoadTemplate = async (templateId: string) => {
+    const template = templates.find((t) => t.id === templateId)
+    if (template) {
+      setSections(template.sections)
+      setDesignSettings(template.design_settings)
+      setTemplateName(template.name)
+      setSelectedSection(template.sections[0] || null)
+      setSelectedSectionId(template.sections[0]?.id || null)
+      setHistory([template.sections])
+      setHistoryIndex(0)
+      setShowTemplates(false)
+    }
+  }
+
+  const handleDeleteTemplate = async (templateId: string) => {
+    try {
+      await deleteTemplate(templateId)
+      setTemplates(templates.filter((t) => t.id !== templateId))
+      alert("Template deleted successfully")
+    } catch (err) {
+      console.error("[v0] Error deleting template:", err)
+      alert("Failed to delete template")
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background flex flex-col overflow-hidden">
       {/* Header */}
@@ -273,9 +319,9 @@ export default function EditorPage() {
 
       {/* Main Editor Area */}
       <div className="flex-1 flex gap-0 overflow-hidden">
-        {/* Sidebar - Hidden on mobile, visible on desktop */}
+        {/* Sidebar - 25% width on desktop */}
         <div
-          className={`${sidebarCollapsed ? "w-0" : "w-80"} hidden md:flex flex-col transition-all duration-200 overflow-hidden border-r border-border/50`}
+          className={`${sidebarCollapsed ? "w-0" : "w-1/4"} hidden md:flex flex-col transition-all duration-200 overflow-hidden border-r border-border/50`}
         >
           <EditorSidebar
             sections={sections}
@@ -287,178 +333,247 @@ export default function EditorPage() {
             onDuplicateSection={handleDuplicateSection}
             isMobile={false}
           />
+          <div
+            className={`${sidebarCollapsed ? "flex" : "hidden"} md:flex items-center shrink-0 w-auto px-2 border-r border-border/50 hover:bg-secondary transition-colors duration-200`}
+          >
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="h-10 w-10 rounded-lg"
+              title={sidebarCollapsed ? "Show sections" : "Hide sections"}
+            >
+              {sidebarCollapsed ? <PanelLeft className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+            </Button>
+          </div>
         </div>
 
-        {/* Sidebar Toggle Button */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className="hidden md:flex h-10 w-10 shrink-0 rounded-none border-r"
-          title={sidebarCollapsed ? "Show sections" : "Hide sections"}
-        >
-          {sidebarCollapsed ? <PanelLeft className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
-        </Button>
+        {/* Main Content - 50% width on desktop */}
+        <div className="hidden md:flex md:w-1/2 flex-col overflow-hidden border-r border-border/50">
+          <div className="flex-1 flex flex-col gap-2 p-2 overflow-hidden">
+            <div className="flex gap-2 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleUndo}
+                disabled={historyIndex === 0}
+                className="gap-2 bg-transparent h-11 min-w-[44px] hover:bg-secondary transition-colors duration-150"
+                title="Undo (Ctrl+Z)"
+              >
+                <Undo2 className="w-4 h-4" />
+                <span className="hidden sm:inline text-xs">Undo</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRedo}
+                disabled={historyIndex === history.length - 1}
+                className="gap-2 bg-transparent h-11 min-w-[44px] hover:bg-secondary transition-colors duration-150"
+                title="Redo (Ctrl+Shift+Z)"
+              >
+                <Redo2 className="w-4 h-4" />
+                <span className="hidden sm:inline text-xs">Redo</span>
+              </Button>
+            </div>
 
-        {/* Main Content - Shows preview or editor based on previewMode */}
-        {!previewMode ? (
-          <div className="flex-1 flex flex-col overflow-hidden">
-            {/* Edit and Design on Mobile */}
-            {mobileView === "edit" && (
-              <div className="flex-1 flex flex-col gap-2 p-2 overflow-hidden">
-                <div className="flex gap-2 shrink-0">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleUndo}
-                    disabled={historyIndex === 0}
-                    className="gap-2 bg-transparent h-11 min-w-[44px] hover:bg-secondary transition-colors duration-150"
-                    title="Undo (Ctrl+Z)"
-                  >
-                    <Undo2 className="w-4 h-4" />
-                    <span className="hidden sm:inline text-xs">Undo</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleRedo}
-                    disabled={historyIndex === history.length - 1}
-                    className="gap-2 bg-transparent h-11 min-w-[44px] hover:bg-secondary transition-colors duration-150"
-                    title="Redo (Ctrl+Shift+Z)"
-                  >
-                    <Redo2 className="w-4 h-4" />
-                    <span className="hidden sm:inline text-xs">Redo</span>
-                  </Button>
+            <Tabs defaultValue="content" className="flex-1 flex flex-col overflow-hidden">
+              <TabsList className="w-full justify-start border-b shrink-0 h-10 md:h-12 bg-transparent">
+                <TabsTrigger
+                  value="content"
+                  className="text-xs md:text-sm data-[state=active]:bg-secondary transition-colors duration-150"
+                >
+                  <span className="hidden sm:inline">Content</span>
+                  <span className="sm:hidden">Edit</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="design"
+                  className="text-xs md:text-sm data-[state=active]:bg-secondary transition-colors duration-150"
+                >
+                  <span className="hidden sm:inline">Design</span>
+                  <span className="sm:hidden">Style</span>
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="content" className="flex-1 overflow-hidden mt-2">
+                <div className="overflow-y-auto h-full pr-2 md:pr-4 relative">
+                  {isTransitioning && (
+                    <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10 rounded-lg backdrop-blur-sm">
+                      <Loader2 className="w-5 h-5 animate-spin text-accent" />
+                    </div>
+                  )}
+                  {selectedSection ? (
+                    <div className="animate-fade-in">
+                      <ProposalEditor
+                        section={selectedSection}
+                        onUpdate={(updates) => updateSection(selectedSection.id, updates)}
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-muted-foreground">Select or add a section to begin editing</p>
+                    </div>
+                  )}
                 </div>
-
-                <Tabs defaultValue="content" className="flex-1 flex flex-col overflow-hidden">
-                  <TabsList className="w-full justify-start border-b shrink-0 h-10 md:h-12 bg-transparent">
-                    <TabsTrigger
-                      value="content"
-                      className="text-xs md:text-sm data-[state=active]:bg-secondary transition-colors duration-150"
-                    >
-                      <span className="hidden sm:inline">Content</span>
-                      <span className="sm:hidden">Edit</span>
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="design"
-                      className="text-xs md:text-sm data-[state=active]:bg-secondary transition-colors duration-150"
-                    >
-                      <span className="hidden sm:inline">Design</span>
-                      <span className="sm:hidden">Style</span>
-                    </TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="content" className="flex-1 overflow-hidden mt-2">
-                    <div className="overflow-y-auto h-full pr-2 md:pr-4 relative">
-                      {isTransitioning && (
-                        <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10 rounded-lg backdrop-blur-sm">
-                          <Loader2 className="w-5 h-5 animate-spin text-accent" />
-                        </div>
-                      )}
-                      {selectedSection ? (
-                        <div className="animate-fade-in">
-                          <ProposalEditor
-                            section={selectedSection}
-                            onUpdate={(updates) => updateSection(selectedSection.id, updates)}
-                          />
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-center h-full">
-                          <p className="text-muted-foreground">Select or add a section to begin editing</p>
-                        </div>
-                      )}
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="design" className="flex-1 overflow-hidden mt-2">
-                    <div className="overflow-y-auto h-full pr-2 md:pr-4">
-                      <DesignPanel settings={designSettings} onUpdate={handleDesignUpdate} />
-                    </div>
-                  </TabsContent>
-                </Tabs>
-              </div>
-            )}
-
-            {/* Sections View on Mobile */}
-            {mobileView === "sections" && (
-              <div className="flex-1 overflow-hidden">
-                <EditorSidebar
-                  sections={sections}
-                  selectedSectionId={selectedSectionId}
-                  onSelectSection={handleSelectSection}
-                  onAddSection={handleAddSection}
-                  onRemoveSection={handleDeleteSection}
-                  onReorderSections={handleReorderSections}
-                  onDuplicateSection={handleDuplicateSection}
-                  isMobile={true}
-                />
-              </div>
-            )}
-
-            {/* Preview on Mobile */}
-            {mobileView === "preview" && (
-              <div className="flex-1 overflow-hidden">
-                <PreviewPanel sections={sections} designSettings={designSettings} />
-              </div>
-            )}
+              </TabsContent>
+              <TabsContent value="design" className="flex-1 overflow-hidden mt-2">
+                <div className="overflow-y-auto h-full pr-2 md:pr-4">
+                  <DesignPanel settings={designSettings} onUpdate={handleDesignUpdate} />
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
-        ) : (
-          <div className="flex-1 overflow-hidden">
-            <PreviewPanel sections={sections} designSettings={designSettings} />
-          </div>
-        )}
+        </div>
 
-        {/* Preview Panel - Desktop Only */}
-        <div className="hidden lg:flex flex-1 overflow-hidden border-l border-border/50">
+        {/* Preview Panel - 25% width on desktop, toggle with preview button */}
+        <div className={`${previewMode ? "hidden md:flex" : "hidden"} md:w-1/4 flex-col overflow-hidden`}>
           <PreviewPanel sections={sections} designSettings={designSettings} />
+        </div>
+
+        {/* Mobile Layout */}
+        <div className="md:hidden flex-1 flex flex-col overflow-hidden">
+          {mobileView === "edit" && (
+            <div className="flex-1 flex flex-col gap-2 p-2 overflow-hidden">
+              <div className="flex gap-2 shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleUndo}
+                  disabled={historyIndex === 0}
+                  className="gap-2 bg-transparent h-11 min-w-[44px] hover:bg-secondary transition-colors duration-150"
+                  title="Undo (Ctrl+Z)"
+                >
+                  <Undo2 className="w-4 h-4" />
+                  <span className="hidden sm:inline text-xs">Undo</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRedo}
+                  disabled={historyIndex === history.length - 1}
+                  className="gap-2 bg-transparent h-11 min-w-[44px] hover:bg-secondary transition-colors duration-150"
+                  title="Redo (Ctrl+Shift+Z)"
+                >
+                  <Redo2 className="w-4 h-4" />
+                  <span className="hidden sm:inline text-xs">Redo</span>
+                </Button>
+              </div>
+
+              <Tabs defaultValue="content" className="flex-1 flex flex-col overflow-hidden">
+                <TabsList className="w-full justify-start border-b shrink-0 h-10 md:h-12 bg-transparent">
+                  <TabsTrigger
+                    value="content"
+                    className="text-xs md:text-sm data-[state=active]:bg-secondary transition-colors duration-150"
+                  >
+                    <span className="hidden sm:inline">Content</span>
+                    <span className="sm:hidden">Edit</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="design"
+                    className="text-xs md:text-sm data-[state=active]:bg-secondary transition-colors duration-150"
+                  >
+                    <span className="hidden sm:inline">Design</span>
+                    <span className="sm:hidden">Style</span>
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="content" className="flex-1 overflow-hidden mt-2">
+                  <div className="overflow-y-auto h-full pr-2 md:pr-4 relative">
+                    {isTransitioning && (
+                      <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10 rounded-lg backdrop-blur-sm">
+                        <Loader2 className="w-5 h-5 animate-spin text-accent" />
+                      </div>
+                    )}
+                    {selectedSection ? (
+                      <div className="animate-fade-in">
+                        <ProposalEditor
+                          section={selectedSection}
+                          onUpdate={(updates) => updateSection(selectedSection.id, updates)}
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center h-full">
+                        <p className="text-muted-foreground">Select or add a section to begin editing</p>
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+                <TabsContent value="design" className="flex-1 overflow-hidden mt-2">
+                  <div className="overflow-y-auto h-full pr-2 md:pr-4">
+                    <DesignPanel settings={designSettings} onUpdate={handleDesignUpdate} />
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </div>
+          )}
+
+          {mobileView === "sections" && (
+            <div className="flex-1 overflow-hidden">
+              <EditorSidebar
+                sections={sections}
+                selectedSectionId={selectedSectionId}
+                onSelectSection={handleSelectSection}
+                onAddSection={handleAddSection}
+                onRemoveSection={handleDeleteSection}
+                onReorderSections={handleReorderSections}
+                onDuplicateSection={handleDuplicateSection}
+                isMobile={true}
+              />
+            </div>
+          )}
+
+          {mobileView === "preview" && (
+            <div className="flex-1 overflow-hidden">
+              <PreviewPanel sections={sections} designSettings={designSettings} />
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Mobile Navigation - Bottom Tabs */}
-      <MobileNav activeView={mobileView} onViewChange={setMobileView} sectionCount={sections.length} />
+      {/* Mobile Navigation */}
+      <MobileNav activeView={mobileView} onViewChange={setMobileView} />
 
+      {/* Template Manager Modal */}
       {showTemplates && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div className="bg-card rounded-lg shadow-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-border">
-            <h2 className="text-xl font-bold mb-4">Saved Templates</h2>
-            {JSON.parse(localStorage.getItem("proposal-templates") || "[]").length === 0 ? (
-              <p className="text-muted-foreground text-center py-8">No templates saved yet.</p>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                {JSON.parse(localStorage.getItem("proposal-templates") || "[]").map((template: any, idx: number) => (
-                  <div
-                    key={idx}
-                    className="border border-border rounded-lg p-4 hover:bg-secondary hover:border-accent transition-all duration-150 cursor-pointer group"
-                  >
-                    <h3 className="font-semibold mb-2 group-hover:text-accent transition-colors">{template.name}</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      {new Date(template.createdAt).toLocaleDateString()}
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setSections(template.sections)
-                        setDesignSettings(template.designSettings)
-                        setTemplateName(template.name)
-                        setSelectedSection(template.sections[0] || null)
-                        setSelectedSectionId(template.sections[0]?.id || null)
-                        setShowTemplates(false)
-                      }}
-                      className="w-full bg-transparent hover:bg-accent/10 h-9 transition-colors duration-150"
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-card border border-border rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-border flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Templates</h2>
+              <button onClick={() => setShowTemplates(false)} className="text-muted-foreground hover:text-foreground">
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              {templates.length === 0 ? (
+                <p className="text-muted-foreground text-center">No templates saved yet</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {templates.map((template) => (
+                    <div
+                      key={template.id}
+                      className="border border-border rounded-lg p-4 hover:bg-secondary transition-colors"
                     >
-                      Load
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <Button
-              variant="outline"
-              className="w-full bg-transparent transition-colors duration-150"
-              onClick={() => setShowTemplates(false)}
-            >
-              Close
-            </Button>
+                      <h3 className="font-semibold mb-2">{template.name}</h3>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="default"
+                          onClick={() => handleLoadTemplate(template.id)}
+                          className="flex-1"
+                        >
+                          Load
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDeleteTemplate(template.id)}
+                          className="px-3"
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

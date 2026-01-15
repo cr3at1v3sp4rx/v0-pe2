@@ -84,10 +84,9 @@ export function analyzeProposalState(sectionEngagement: SectionAnalytics[]): Pro
   const viewCoverage = sectionEngagement.filter((s) => s.viewCount > 0).length / sectionEngagement.length
   const readiness = Math.round((avgRevisits * 15 + viewCoverage * 85) * 1)
 
-  // Find bottleneck sections (low engagement on critical sections)
   const criticalSections = ["Pricing", "Timeline", "Executive Summary"]
   const bottleneck = sectionEngagement.find(
-    (s) => criticalSections.some((cs) => s.sectionTitle.includes(cs)) && s.avgTimePerView < 30,
+    (s) => s.sectionTitle && criticalSections.some((cs) => s.sectionTitle.includes(cs)) && s.avgTimePerView < 30,
   )
 
   if (readiness < 25) {
@@ -158,36 +157,36 @@ export function detectIntent(sectionEngagement: SectionAnalytics[]): IntentSigna
   let intent: "reviewing" | "hesitating" | "confused" | "ready" | "unknown" = "unknown"
 
   // Analyze patterns
-  const pricingSection = sectionEngagement.find((s) => s.sectionTitle.includes("Pricing"))
-  const executiveSummary = sectionEngagement.find((s) => s.sectionTitle.includes("Executive Summary"))
-  const avgRevisits = sectionEngagement.reduce((sum, s) => sum + s.revisitCount, 0) / sectionEngagement.length
+  const pricingSection = sectionEngagement.find((s) => s.sectionTitle && s.sectionTitle.includes("Pricing"))
+  const executiveSummary = sectionEngagement.find((s) => s.sectionTitle && s.sectionTitle.includes("Executive Summary"))
+  const avgRevisits = sectionEngagement.reduce((sum, s) => sum + (s.revisitCount || 0), 0) / sectionEngagement.length
 
   // Ready signals: High engagement, pricing viewed, multiple revisits
   if (
     pricingSection &&
-    pricingSection.viewCount > 3 &&
-    pricingSection.revisitCount > 1 &&
+    (pricingSection.viewCount || 0) > 3 &&
+    (pricingSection.revisitCount || 0) > 1 &&
     executiveSummary &&
-    executiveSummary.viewCount > 0
+    (executiveSummary.viewCount || 0) > 0
   ) {
     intent = "ready"
     confidence = 85
     signals.push("Multiple reviews of pricing section", "Thorough exploration of proposal", "High engagement depth")
   }
   // Hesitating: Views everything but keeps coming back to price
-  else if (pricingSection && pricingSection.revisitCount > 2 && pricingSection.timeSpent > 300) {
+  else if (pricingSection && (pricingSection.revisitCount || 0) > 2 && (pricingSection.timeSpent || 0) > 300) {
     intent = "hesitating"
     confidence = 75
     signals.push("Repeated focus on pricing", "Long time spent evaluating cost", "Possible budget concerns")
   }
   // Confused: Inconsistent viewing patterns or very short views
-  else if (sectionEngagement.some((s) => s.avgTimePerView < 20) && sectionEngagement.length > 1) {
+  else if (sectionEngagement.some((s) => (s.avgTimePerView || 0) < 20) && sectionEngagement.length > 1) {
     intent = "confused"
     confidence = 60
     signals.push("Quick, inconsistent section views", "May need clarification", "Consider proactive outreach")
   }
   // Reviewing: Methodical engagement
-  else if (sectionEngagement.filter((s) => s.viewCount > 0).length > 3 && avgRevisits < 1.5) {
+  else if (sectionEngagement.filter((s) => (s.viewCount || 0) > 0).length > 3 && avgRevisits < 1.5) {
     intent = "reviewing"
     confidence = 70
     signals.push("Systematic review in progress", "Steady engagement", "Normal evaluation timeline")

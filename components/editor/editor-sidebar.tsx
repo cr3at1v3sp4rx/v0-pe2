@@ -178,8 +178,8 @@ export function EditorSidebar({
                 onClick={() => onAddSection(type.id)}
                 className="flex items-start gap-3 py-3 px-3 animate-fade-in cursor-pointer"
               >
-                <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
-                  <type.icon className="w-5 h-5 text-emerald-600" />
+                <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
+                  <type.icon className="w-5 h-5 text-accent" />
                 </div>
                 <div>
                   <span className="font-medium text-sm block">{type.label}</span>
