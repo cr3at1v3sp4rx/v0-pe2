@@ -1,19 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import {
-  Eye,
-  EyeOff,
-  Download,
-  FileText,
-  Save,
-  MoreHorizontal,
-  ExternalLink,
-  Copy,
-  Check,
-  Settings,
-  ArrowLeft,
-} from "lucide-react"
+import { FileText, Save, MoreHorizontal, ExternalLink, Copy, Check, Settings, ArrowLeft, Loader2 } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,8 +13,6 @@ import Link from "next/link"
 import { useState } from "react"
 
 interface EditorHeaderProps {
-  onPreviewToggle: (mode: boolean) => void
-  previewMode: boolean
   currentTemplateName: string
   onShowTemplates: () => void
   onSaveTemplate: () => void
@@ -37,8 +23,6 @@ interface EditorHeaderProps {
 }
 
 export function EditorHeader({
-  onPreviewToggle,
-  previewMode,
   currentTemplateName,
   onShowTemplates,
   onSaveTemplate,
@@ -59,122 +43,89 @@ export function EditorHeader({
   }
 
   return (
-    <header className="border-b border-border bg-card px-4 md:px-6 py-3 md:py-4 flex items-center justify-between gap-2">
-      <div className="min-w-0 flex-1 flex items-center gap-2">
-        <Link href="/dashboard">
-          <Button variant="outline" size="icon" className="h-10 w-10 bg-transparent shrink-0">
-            <ArrowLeft className="w-5 h-5" />
+    <header className="sticky top-0 z-10 border-b border-border/50 bg-background/95 backdrop-blur-sm">
+      <div className="flex h-16 items-center justify-between px-4 gap-4">
+        {/* Left: Home button and title */}
+        <div className="flex items-center gap-3 min-w-0">
+          <Link href="/dashboard">
+            <Button variant="ghost" size="icon" className="h-9 w-9">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <h1 className="text-sm font-semibold truncate">{currentTemplateName}</h1>
+        </div>
+
+        {/* Right: Action buttons */}
+        <div className="flex items-center gap-2">
+          {/* Save button */}
+          <Button onClick={onSaveProposal} disabled={isSaving} className="gap-2" size="sm">
+            {isSaving ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Saving
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4" />
+                <span className="hidden sm:inline">Save</span>
+              </>
+            )}
           </Button>
-        </Link>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 md:gap-3 mb-0.5">
-            <FileText className="w-5 h-5 text-primary shrink-0" />
-            <h1 className="text-lg md:text-2xl font-bold text-foreground truncate">Proposal Builder</h1>
-          </div>
-          <p className="text-xs md:text-sm text-muted-foreground truncate">
-            {currentTemplateName || "Untitled Template"}
-          </p>
+
+          {/* Settings button */}
+          <Link href="/settings">
+            <Button variant="outline" size="icon" className="h-9 w-9 bg-transparent">
+              <Settings className="h-4 w-4" />
+            </Button>
+          </Link>
+
+          {/* More options menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" className="h-9 w-9 bg-transparent">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onShowTemplates}>
+                <FileText className="h-4 w-4 mr-2" />
+                Templates
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onSaveTemplate}>
+                <Save className="h-4 w-4 mr-2" />
+                Save as Template
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onOpenClientView}>
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Open Client View
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  if (proposalId) {
+                    navigator.clipboard.writeText(`${window.location.origin}/view/${proposalId}`)
+                    setCopied(true)
+                    setTimeout(() => setCopied(false), 2000)
+                  }
+                }}
+              >
+                {copied ? (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy Link
+                  </>
+                )}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
-
-      {/* Desktop buttons */}
-      <div className="hidden md:flex items-center gap-3">
-        <Button variant="outline" onClick={onShowTemplates} className="gap-2 bg-transparent h-11">
-          <FileText className="w-4 h-4" />
-          Templates
-        </Button>
-        <Button variant="outline" onClick={onSaveProposal} disabled={isSaving} className="gap-2 bg-transparent h-11">
-          <Save className="w-4 h-4" />
-          {isSaving ? "Saving..." : "Save"}
-        </Button>
-        <Button variant="outline" onClick={() => onPreviewToggle(!previewMode)} className="gap-2 h-11">
-          {previewMode ? (
-            <>
-              <EyeOff className="w-4 h-4" />
-              Edit
-            </>
-          ) : (
-            <>
-              <Eye className="w-4 h-4" />
-              Preview
-            </>
-          )}
-        </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90 h-11">
-              <ExternalLink className="w-4 h-4" />
-              Share
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-64">
-            <DropdownMenuItem onClick={onOpenClientView} className="gap-2 py-3 cursor-pointer">
-              <Eye className="w-4 h-4" />
-              Open Client View
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleCopyLink} className="gap-2 py-3 cursor-pointer">
-              {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-              {copied ? "Copied!" : "Copy Link"}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="gap-2 py-3 cursor-pointer">
-              <Download className="w-4 h-4" />
-              Export PDF
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link href="/settings" className="flex items-center gap-2 cursor-pointer">
-                <Settings className="w-4 h-4" />
-                Settings
-              </Link>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <Link href="/settings">
-          <Button variant="outline" size="icon" className="h-11 w-11 bg-transparent">
-            <Settings className="w-5 h-5" />
-          </Button>
-        </Link>
-      </div>
-
-      {/* Mobile dropdown menu */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="icon" className="md:hidden h-11 w-11 bg-transparent">
-            <MoreHorizontal className="w-5 h-5" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-48">
-          <DropdownMenuItem onClick={onShowTemplates} className="gap-2 py-3">
-            <FileText className="w-4 h-4" />
-            Templates
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={onSaveProposal} disabled={isSaving} className="gap-2 py-3">
-            <Save className="w-4 h-4" />
-            {isSaving ? "Saving..." : "Save Proposal"}
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={onOpenClientView} className="gap-2 py-3">
-            <Eye className="w-4 h-4" />
-            Client View
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={handleCopyLink} className="gap-2 py-3">
-            {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-            {copied ? "Copied!" : "Copy Link"}
-          </DropdownMenuItem>
-          <DropdownMenuItem className="gap-2 py-3">
-            <Download className="w-4 h-4" />
-            Export PDF
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem asChild>
-            <Link href="/settings" className="flex items-center gap-2 cursor-pointer">
-              <Settings className="w-4 h-4" />
-              Settings
-            </Link>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
     </header>
   )
 }

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Lock, FileText } from "lucide-react"
+import { createBrowserClient } from "@supabase/ssr"
 
 interface ProposalData {
   sections: any[]
@@ -29,38 +30,68 @@ export default function SharePage() {
   const [proposal, setProposal] = useState<ProposalData | null>(null)
 
   useEffect(() => {
-    // Get share link info from localStorage
-    const shareLinks = JSON.parse(localStorage.getItem("shareLinks") || "{}")
-    const link = shareLinks[shareId]
+    const loadShareLink = async () => {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
+      )
 
-    if (!link) {
-      setError("This shared link is no longer available")
-      return
+      // Get share link info
+      const { data: shareData } = await supabase.from("shares").select("*").eq("id", shareId).single()
+
+      if (!shareData) {
+        setError("This shared link is no longer available")
+        return
+      }
+
+      // Update last viewed
+      await supabase
+        .from("shares")
+        .update({
+          last_viewed: new Date(),
+          view_count: (shareData.view_count || 0) + 1,
+        })
+        .eq("id", shareId)
+
+      // Get the proposal
+      const { data: proposalData } = await supabase
+        .from("proposals")
+        .select("*")
+        .eq("id", shareData.proposal_id)
+        .single()
+
+      if (proposalData) {
+        const proposal: ProposalData = {
+          sections: proposalData.sections || [],
+          designSettings: proposalData.design_settings || {
+            accentColor: "#1e40af",
+            coverStyle: "gradient",
+            typography: "modern",
+          },
+          templateName: proposalData.template_name || "Untitled Proposal",
+        }
+        setProposal(proposal)
+      }
+
+      if (!shareData.password) {
+        setAuthorized(true)
+      } else {
+        setPasswordProtected(true)
+      }
     }
 
-    // Update last viewed timestamp
-    link.lastViewed = Date.now()
-    link.viewCount = (link.viewCount || 0) + 1
-    localStorage.setItem("shareLinks", JSON.stringify(shareLinks))
-
-    // Get the proposal data from sessionStorage
-    const storedProposal = sessionStorage.getItem(`proposal-${link.proposalId}`)
-    if (storedProposal) {
-      setProposal(JSON.parse(storedProposal))
-    }
-
-    if (!link.password) {
-      setAuthorized(true)
-    } else {
-      setPasswordProtected(true)
-    }
+    loadShareLink()
   }, [shareId])
 
-  const handlePasswordSubmit = () => {
-    const shareLinks = JSON.parse(localStorage.getItem("shareLinks") || "{}")
-    const link = shareLinks[shareId]
+  const handlePasswordSubmit = async () => {
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
+    )
 
-    if (btoa(password) === link.password) {
+    const { data: shareData } = await supabase.from("shares").select("password").eq("id", shareId).single()
+
+    if (shareData && btoa(password) === shareData.password) {
       setAuthorized(true)
       setError("")
     } else {
@@ -122,11 +153,41 @@ export default function SharePage() {
     )
   }
 
+  const { sections, designSettings } = proposal
+  const accentColor = designSettings?.accentColor || "#1e40af"
+  const coverStyle = designSettings?.coverStyle || "gradient"
+
+  const getCoverBackground = () => {
+    if (coverStyle === "gradient") {
+      return `linear-gradient(135deg, ${accentColor} 0%, ${accentColor}dd 100%)`
+    } else if (coverStyle === "solid") {
+      return accentColor
+    } else {
+      return "#f8f8f8"
+    }
+  }
+
+  // Import renderSection from the client view or create it here
+  const renderSection = (section: any) => {
+    // Placeholder for section rendering logic
+    return <div>{section.title}</div>
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/20">
-      <p className="text-center py-12 text-muted-foreground">
-        Proposal shared successfully. Rendering proposal content...
-      </p>
+    <div className="min-h-screen bg-background">
+      {/* Render all sections like the client view does */}
+      {sections.map((section) => renderSection(section))}
+
+      {/* CTA Section at bottom */}
+      <section className="py-16 md:py-24 px-6 md:px-16 bg-muted/30">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-3xl md:text-5xl font-bold mb-6 text-foreground">Ready to move forward?</h2>
+          <p className="text-lg text-muted-foreground mb-8">Accept this proposal to get started</p>
+          <Button size="lg" className="h-12 px-8 text-lg" style={{ backgroundColor: accentColor }}>
+            Accept Proposal
+          </Button>
+        </div>
+      </section>
     </div>
   )
 }

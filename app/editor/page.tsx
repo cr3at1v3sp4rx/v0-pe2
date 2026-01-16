@@ -10,7 +10,7 @@ import { PreviewPanel } from "@/components/editor/preview-panel"
 import { MobileNav } from "@/components/editor/mobile-nav"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { PanelLeft, PanelLeftClose, Undo2, Redo2, Loader2 } from "lucide-react"
+import { Undo2, Redo2, Loader2 } from "lucide-react"
 import {
   createProposal,
   updateProposal,
@@ -38,11 +38,14 @@ export default function EditorPage() {
   const [sections, setSections] = useState<any[]>([])
   const [templateName, setTemplateName] = useState("Untitled Proposal")
   const [showTemplates, setShowTemplates] = useState(false)
-  const [previewMode, setPreviewMode] = useState(false)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [proposalId, setProposalId] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [templates, setTemplates] = useState<any[]>([])
+
+  const handleSectionChange = (updates: any) => {
+    updateSection(selectedSection.id, updates)
+  }
 
   useEffect(() => {
     const loadProposal = async () => {
@@ -306,8 +309,6 @@ export default function EditorPage() {
     <div className="min-h-screen bg-background flex flex-col overflow-hidden">
       {/* Header */}
       <EditorHeader
-        previewMode={previewMode}
-        onPreviewToggle={setPreviewMode}
         currentTemplateName={templateName}
         onShowTemplates={() => setShowTemplates(true)}
         onSaveTemplate={handleSaveTemplate}
@@ -321,35 +322,62 @@ export default function EditorPage() {
       <div className="flex-1 flex gap-0 overflow-hidden">
         {/* Sidebar - 25% width on desktop */}
         <div
-          className={`${sidebarCollapsed ? "w-0" : "w-1/4"} hidden md:flex flex-col transition-all duration-200 overflow-hidden border-r border-border/50`}
+          className={`transition-all duration-300 flex-shrink-0 ${
+            sidebarCollapsed ? "w-0" : "w-1/4"
+          } border-r border-border/50 overflow-y-auto`}
         >
-          <EditorSidebar
-            sections={sections}
-            selectedSectionId={selectedSectionId}
-            onSelectSection={handleSelectSection}
-            onAddSection={handleAddSection}
-            onRemoveSection={handleDeleteSection}
-            onReorderSections={handleReorderSections}
-            onDuplicateSection={handleDuplicateSection}
-            isMobile={false}
-          />
-          <div
-            className={`${sidebarCollapsed ? "flex" : "hidden"} md:flex items-center shrink-0 w-auto px-2 border-r border-border/50 hover:bg-secondary transition-colors duration-200`}
-          >
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="h-10 w-10 rounded-lg"
-              title={sidebarCollapsed ? "Show sections" : "Hide sections"}
-            >
-              {sidebarCollapsed ? <PanelLeft className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
-            </Button>
-          </div>
+          {!sidebarCollapsed && (
+            <EditorSidebar
+              sections={sections}
+              selectedSectionId={selectedSectionId}
+              onSelectSection={handleSelectSection}
+              onAddSection={handleAddSection}
+              onDeleteSection={handleDeleteSection}
+              onDuplicateSection={handleDuplicateSection}
+              onReorderSections={handleReorderSections}
+            />
+          )}
         </div>
 
         {/* Main Content - 50% width on desktop */}
-        <div className="hidden md:flex md:w-1/2 flex-col overflow-hidden border-r border-border/50">
+        <div className="w-1/2 border-r border-border/50 overflow-y-auto">
+          <Tabs value="edit" onValueChange={() => {}} className="h-full flex flex-col">
+            <TabsList className="w-full rounded-none border-b border-border/50">
+              <TabsTrigger value="edit" className="flex-1">
+                Edit
+              </TabsTrigger>
+              <TabsTrigger value="design" className="flex-1">
+                Design
+              </TabsTrigger>
+            </TabsList>
+
+            <div className="flex-1 overflow-y-auto">
+              <TabsContent value="edit" className="m-0 h-full">
+                {selectedSection ? (
+                  <ProposalEditor section={selectedSection} onUpdate={handleSectionChange} />
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <p className="text-muted-foreground">No section selected</p>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="design" className="m-0 h-full">
+                <DesignPanel designSettings={designSettings} onChange={setDesignSettings} />
+              </TabsContent>
+            </div>
+          </Tabs>
+        </div>
+
+        {/* Preview Panel - always visible now */}
+        <div className="w-1/4 border-l border-border/50 overflow-y-auto">
+          <PreviewPanel sections={sections} designSettings={designSettings} />
+        </div>
+      </div>
+
+      {/* Mobile Layout */}
+      <div className="md:hidden flex-1 flex flex-col overflow-hidden">
+        {mobileView === "edit" && (
           <div className="flex-1 flex flex-col gap-2 p-2 overflow-hidden">
             <div className="flex gap-2 shrink-0">
               <Button
@@ -421,110 +449,28 @@ export default function EditorPage() {
               </TabsContent>
             </Tabs>
           </div>
-        </div>
+        )}
 
-        {/* Preview Panel - 25% width on desktop, toggle with preview button */}
-        <div className={`${previewMode ? "hidden md:flex" : "hidden"} md:w-1/4 flex-col overflow-hidden`}>
-          <PreviewPanel sections={sections} designSettings={designSettings} />
-        </div>
+        {mobileView === "sections" && (
+          <div className="flex-1 overflow-hidden">
+            <EditorSidebar
+              sections={sections}
+              selectedSectionId={selectedSectionId}
+              onSelectSection={handleSelectSection}
+              onAddSection={handleAddSection}
+              onDeleteSection={handleDeleteSection}
+              onDuplicateSection={handleDuplicateSection}
+              onReorderSections={handleReorderSections}
+              isMobile={true}
+            />
+          </div>
+        )}
 
-        {/* Mobile Layout */}
-        <div className="md:hidden flex-1 flex flex-col overflow-hidden">
-          {mobileView === "edit" && (
-            <div className="flex-1 flex flex-col gap-2 p-2 overflow-hidden">
-              <div className="flex gap-2 shrink-0">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleUndo}
-                  disabled={historyIndex === 0}
-                  className="gap-2 bg-transparent h-11 min-w-[44px] hover:bg-secondary transition-colors duration-150"
-                  title="Undo (Ctrl+Z)"
-                >
-                  <Undo2 className="w-4 h-4" />
-                  <span className="hidden sm:inline text-xs">Undo</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRedo}
-                  disabled={historyIndex === history.length - 1}
-                  className="gap-2 bg-transparent h-11 min-w-[44px] hover:bg-secondary transition-colors duration-150"
-                  title="Redo (Ctrl+Shift+Z)"
-                >
-                  <Redo2 className="w-4 h-4" />
-                  <span className="hidden sm:inline text-xs">Redo</span>
-                </Button>
-              </div>
-
-              <Tabs defaultValue="content" className="flex-1 flex flex-col overflow-hidden">
-                <TabsList className="w-full justify-start border-b shrink-0 h-10 md:h-12 bg-transparent">
-                  <TabsTrigger
-                    value="content"
-                    className="text-xs md:text-sm data-[state=active]:bg-secondary transition-colors duration-150"
-                  >
-                    <span className="hidden sm:inline">Content</span>
-                    <span className="sm:hidden">Edit</span>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="design"
-                    className="text-xs md:text-sm data-[state=active]:bg-secondary transition-colors duration-150"
-                  >
-                    <span className="hidden sm:inline">Design</span>
-                    <span className="sm:hidden">Style</span>
-                  </TabsTrigger>
-                </TabsList>
-                <TabsContent value="content" className="flex-1 overflow-hidden mt-2">
-                  <div className="overflow-y-auto h-full pr-2 md:pr-4 relative">
-                    {isTransitioning && (
-                      <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10 rounded-lg backdrop-blur-sm">
-                        <Loader2 className="w-5 h-5 animate-spin text-accent" />
-                      </div>
-                    )}
-                    {selectedSection ? (
-                      <div className="animate-fade-in">
-                        <ProposalEditor
-                          section={selectedSection}
-                          onUpdate={(updates) => updateSection(selectedSection.id, updates)}
-                        />
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center h-full">
-                        <p className="text-muted-foreground">Select or add a section to begin editing</p>
-                      </div>
-                    )}
-                  </div>
-                </TabsContent>
-                <TabsContent value="design" className="flex-1 overflow-hidden mt-2">
-                  <div className="overflow-y-auto h-full pr-2 md:pr-4">
-                    <DesignPanel settings={designSettings} onUpdate={handleDesignUpdate} />
-                  </div>
-                </TabsContent>
-              </Tabs>
-            </div>
-          )}
-
-          {mobileView === "sections" && (
-            <div className="flex-1 overflow-hidden">
-              <EditorSidebar
-                sections={sections}
-                selectedSectionId={selectedSectionId}
-                onSelectSection={handleSelectSection}
-                onAddSection={handleAddSection}
-                onRemoveSection={handleDeleteSection}
-                onReorderSections={handleReorderSections}
-                onDuplicateSection={handleDuplicateSection}
-                isMobile={true}
-              />
-            </div>
-          )}
-
-          {mobileView === "preview" && (
-            <div className="flex-1 overflow-hidden">
-              <PreviewPanel sections={sections} designSettings={designSettings} />
-            </div>
-          )}
-        </div>
+        {mobileView === "preview" && (
+          <div className="flex-1 overflow-hidden">
+            <PreviewPanel sections={sections} designSettings={designSettings} />
+          </div>
+        )}
       </div>
 
       {/* Mobile Navigation */}

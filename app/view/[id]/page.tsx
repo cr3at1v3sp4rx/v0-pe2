@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Check, FileText, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import type { SectionView, ClientEngagement } from "@/lib/analytics-types"
+import { createBrowserClient } from "@supabase/ssr"
 
 interface Section {
   id: string
@@ -35,12 +36,30 @@ export default function ClientViewPage() {
   const [sectionViews, setSectionViews] = useState<SectionView[]>([])
 
   useEffect(() => {
-    // Retrieve proposal data from sessionStorage
-    const storedData = sessionStorage.getItem(`proposal-${params.id}`)
-    if (storedData) {
-      setProposal(JSON.parse(storedData))
+    const loadProposal = async () => {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
+      )
+
+      const { data, error } = await supabase.from("proposals").select("*").eq("id", params.id).single()
+
+      if (data) {
+        const proposalData: ProposalData = {
+          sections: data.sections || [],
+          designSettings: data.design_settings || {
+            accentColor: "#1e40af",
+            coverStyle: "gradient",
+            typography: "modern",
+          },
+          templateName: data.template_name || "Untitled Proposal",
+        }
+        setProposal(proposalData)
+      }
+      setLoading(false)
     }
-    setLoading(false)
+
+    loadProposal()
   }, [params.id])
 
   useEffect(() => {
@@ -89,7 +108,12 @@ export default function ClientViewPage() {
     }
   }, [proposal, sessionStartTime])
 
-  const saveAnalytics = () => {
+  const saveAnalytics = async () => {
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
+    )
+
     const engagement: ClientEngagement = {
       proposalId: params.id as string,
       clientId: `client-${Date.now()}`,
@@ -106,9 +130,13 @@ export default function ClientViewPage() {
       ),
     }
 
-    // Save to localStorage for persistence
-    const existingEngagements = JSON.parse(localStorage.getItem(`engagements-${params.id}`) || "[]")
-    localStorage.setItem(`engagements-${params.id}`, JSON.stringify([...existingEngagements, engagement]))
+    await supabase.from("engagements").insert([
+      {
+        proposal_id: params.id,
+        client_id: engagement.clientId,
+        data: engagement,
+      },
+    ])
   }
 
   useEffect(() => {
@@ -238,7 +266,7 @@ export default function ClientViewPage() {
                 {(section.content.packages || []).map((pkg: any, i: number) => (
                   <Card
                     key={i}
-                    className={`p-6 md:p-8 hover:shadow-xl transition-all ${i === 1 ? "ring-2 scale-105" : ""}`}
+                    className={`p-6 md:p-8 hover:shadow-lg transition-all ${i === 1 ? "ring-2 scale-105" : ""}`}
                     style={{
                       ringColor: i === 1 ? accentColor : undefined,
                       borderTopWidth: "4px",
