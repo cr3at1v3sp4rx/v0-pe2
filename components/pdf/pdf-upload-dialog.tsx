@@ -23,7 +23,12 @@ export function PDFUploadDialog({ isOpen, onClose, onUploadComplete }: PDFUpload
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`
+      try {
+        pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).href
+      } catch {
+        // Fallback: Use the minified worker without module syntax
+        pdfjs.GlobalWorkerOptions.workerSrc = `/pdf.worker.min.js`
+      }
     }
   }, [])
 
